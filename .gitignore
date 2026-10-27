@@ -1,0 +1,82 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# Xcode
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Xcode build products
+build/
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Code coverage
+*.profdata
+*.profraw
+coverage/
+.coverage/
+
+# Documentation output
+.docc-build/
+docs-build/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.tmp/
+
+# Logs
+*.log
+Logs/
+
+# Environment and local configuration
+.env
+.env.*
+!.env.example
+.netrc
+
+# Signing credentials and certificates
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+*.provisionprofile
+*.pem
+*.key
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output/
+
+# Dependency managers
+Pods/
+Carthage/Build/
+
+# IDEs
+.idea/
+.vscode/
+
+# Local example application build output
+Example/.build/
+Example/DerivedData/
