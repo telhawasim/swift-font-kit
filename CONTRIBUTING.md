@@ -22,8 +22,8 @@ Small documentation and test corrections may be submitted directly.
 Clone the repository:
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/SwiftFontKit.git
-cd SwiftFontKit
+git clone https://github.com/telhawasim/swift-font-kit.git
+cd swift-font-kit
 ```
 
 Create a branch:

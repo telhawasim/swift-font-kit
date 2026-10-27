@@ -11,9 +11,7 @@ let package = Package(
             targets: ["SwiftFontKit"]
         ),
     ],
-    dependencies: [
-        .package(url: "https://github.com/telhawasim/swift-font-kit", from: "0.1.0")
-    ],
+    dependencies: [],
     targets: [
         .target(
             name: "SwiftFontKit",

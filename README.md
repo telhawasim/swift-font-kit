@@ -28,7 +28,7 @@ It removes the need to manually download font files, add them to an Xcode target
 2. Select **File → Add Package Dependencies**.
 3. Enter:
 ```text
-https://github.com/telhawasim/SwiftFontKit.git
+https://github.com/telhawasim/swift-font-kit.git
 ```
 4. Select **Up to Next Major Version**.
 5. Use `0.1.0` as the minimum version.
@@ -38,7 +38,7 @@ https://github.com/telhawasim/SwiftFontKit.git
 ```swift
 dependencies: [
     .package(
-        url: "https://github.com/YOUR_GITHUB_USERNAME/SwiftFontKit.git",
+        url: "https://github.com/telhawasim/swift-font-kit.git",
         from: "0.1.0"
     )
 ]
@@ -47,11 +47,11 @@ dependencies: [
 Add the product to your target:
 ```swift
 .target(
-    name: "SwiftFontKit",
+    name: "YourAppTarget",
     dependencies: [
         .product(
             name: "SwiftFontKit",
-            package: "SwiftFontKit"
+            package: "swift-font-kit"
         )
     ]
 )
