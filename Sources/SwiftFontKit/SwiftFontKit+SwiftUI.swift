@@ -118,6 +118,46 @@ private struct GoogleFontModifier: ViewModifier {
     }
 }
 
+@MainActor
+private struct ObservableFontModifier: ViewModifier {
+
+    // MARK: - PROPERTIES -
+
+    /// ObservedObject
+    @ObservedObject var loader: FontLoader
+    /// Normal
+    let size: CGFloat
+    let relativeTo: Font.TextStyle
+    /// Environment
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// Computed
+    private var resolvedFont: Font {
+        let traits = UITraitCollection(preferredContentSizeCategory: dynamicTypeSize.uiKitCategory)
+
+        if let handle = loader.state.handle {
+            return Font(
+                handle.uiFont(size: size, relativeTo: relativeTo.uiKitStyle, compatibleWith: traits)
+            )
+        }
+
+        let fallback = UIFont.systemFont(ofSize: size, weight: loader.request.weight.uiKitWeight)
+        let scaledFallback = UIFontMetrics(forTextStyle: relativeTo.uiKitStyle).scaledFont(
+            for: fallback, compatibleWith: traits
+        )
+
+        return Font(scaledFallback)
+    }
+
+    // MARK: - LIFECYCLE -
+    func body(content: Content) -> some View {
+        content
+            .font(resolvedFont)
+            .task {
+                await loader.load()
+            }
+    }
+}
+
 public extension View {
 
     func googleFont(
@@ -160,5 +200,18 @@ public extension View {
             size: size,
             relativeTo: relativeTo
         ))
+    }
+
+    @MainActor
+    func fontKitFont(
+        using loader: FontLoader,
+        size: CGFloat,
+        relativeTo: Font.TextStyle = .body
+    ) -> some View {
+        modifier(ObservableFontModifier(
+            loader: loader,
+            size: size,
+            relativeTo: relativeTo)
+        )
     }
 }
