@@ -20,6 +20,7 @@ public actor SwiftFontKit {
     private var registry = FontRegistry()
     private var loadedFonts: [FontRequest: FontHandle] = [:]
     private var inFlight: [FontRequest: Task<FontHandle, Error>] = [:]
+    private var inspectedFamilies: [FontSource: FontFamilyInfo] = [:]
 
     // MARK: - INITIALIZER -
     public init(
@@ -82,12 +83,90 @@ public actor SwiftFontKit {
     public func isLoaded(_ request: FontRequest) -> Bool {
         loadedFonts[request] != nil
     }
+
+    public func inspect(_ source: FontSource) async throws -> FontFamilyInfo {
+        if let cached = inspectedFamilies[source] {
+            return cached
+        }
+
+        let files: [URL]
+
+        switch source {
+        case .local(let url):
+            files = [try loadLocalFile(at: url)]
+
+        case .url(let url):
+            guard url.scheme?.lowercased() == "https",
+                  url.host != nil else {
+                throw FontKitError.invalidSource
+            }
+
+            let ext = url.pathExtension.lowercased()
+            guard ["ttf", "otf"].contains(ext) else {
+                throw FontKitError.unsupportedFormat
+            }
+
+            let data = try await transport.get(url, maximumBytes: 25_000_000)
+
+            guard FontSignature.isSupported(data) else {
+                throw FontKitError.invalidFontData
+            }
+
+            files = [try cache.storeLocal(data: data, fileExtension: ext)]
+
+        case .google(let family):
+            guard let familyCatalog = catalog as? FontFamilyAssetCatalog else {
+                throw FontKitError.familyInspectionUnavailable
+            }
+
+            let assets = try await familyCatalog.assets(family: family)
+            var downloaded: [URL] = []
+
+            for asset in assets {
+                try Task.checkCancellation()
+
+                let data = try await transport.get(asset.remoteURL, maximumBytes: 25_000_000)
+
+                guard FontSignature.isSupported(data) else {
+                    throw FontKitError.invalidFontData
+                }
+
+                let ext = URL(fileURLWithPath: asset.filename).pathExtension.lowercased()
+
+                downloaded.append(try cache.storeLocal(data: data, fileExtension: ext))
+            }
+
+            files = downloaded
+        }
+
+        let inspected = try files.map {
+            try FontFileInspector.inspect(fileURL: $0)
+        }
+
+        guard let first = inspected.first else {
+            throw FontKitError.invalidFontData
+        }
+
+        let result = FontFamilyInfo(
+            familyName: first.familyName,
+            faces: inspected.flatMap(\.faces)
+        )
+
+        inspectedFamilies[source] = result
+        return result
+    }
 }
 
 // MARK: - HELPER FUNCTIONS -
 extension SwiftFontKit {
 
     private func performLoad(_ request: FontRequest) async throws -> FontHandle {
+        if case .local(let sourceURL) = request.source {
+            let fileURL = try loadLocalFile(at: sourceURL)
+            return try registry.register(fileURL: fileURL, request: request)
+        }
+
+        /// Existing cached/remote loading code follows unchanged.
         let fileURL: URL
 
         if let cached = cache.cachedFile(for: request) {
@@ -130,6 +209,57 @@ extension SwiftFontKit {
             }
 
             return FontAsset(remoteURL: url, filename: url.lastPathComponent)
+
+        case .local:
+            throw FontKitError.invalidSource
         }
+    }
+    
+    /// In order to load the local file
+    /// - Parameter sourceURL: `URL` respected url which needs to be loaded
+    /// - Returns: `URL` returne the url which was retrieved
+    private func loadLocalFile(at sourceURL: URL) throws -> URL {
+        guard sourceURL.isFileURL else {
+            throw FontKitError.invalidSource
+        }
+
+        let ext = sourceURL.pathExtension.lowercased()
+        guard ["ttf", "otf"].contains(ext) else {
+            throw FontKitError.unsupportedFormat
+        }
+
+        let values: URLResourceValues
+
+        do {
+            values = try sourceURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        } catch {
+            throw FontKitError.invalidSource
+        }
+
+        guard values.isRegularFile == true else {
+            throw FontKitError.invalidSource
+        }
+
+        if let size = values.fileSize, size > 25_000_000 {
+            throw FontKitError.fileTooLarge
+        }
+
+        let data: Data
+
+        do {
+            data = try Data(contentsOf: sourceURL)
+        } catch {
+            throw FontKitError.invalidSource
+        }
+
+        guard data.count <= 25_000_000 else {
+            throw FontKitError.fileTooLarge
+        }
+
+        guard FontSignature.isSupported(data) else {
+            throw FontKitError.invalidFontData
+        }
+
+        return try cache.storeLocal(data: data, fileExtension: ext)
     }
 }

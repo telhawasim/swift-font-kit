@@ -19,7 +19,7 @@ struct GithubEntry: Decodable, Sendable {
     }
 }
 
-public struct GoogleFontGithubCatalog: FontCatalog {
+public struct GoogleFontGithubCatalog: FontFamilyAssetCatalog {
 
     // MARK: - PROPERTIES -
 
@@ -98,6 +98,63 @@ public struct GoogleFontGithubCatalog: FontCatalog {
         }
 
         return FontAsset(remoteURL: url, filename: selected.name, licenseURL: licenseURL)
+    }
+
+    public func assets(family: String) async throws -> [FontAsset] {
+        let slug = family.lowercased()
+            .unicodeScalars
+            .filter {
+                CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789").contains($0)
+            }
+            .map(String.init)
+            .joined()
+
+        guard !slug.isEmpty, slug.count <= 100 else {
+            throw FontKitError.invalidSource
+        }
+
+        var rootPath: String?
+        var entries: [GithubEntry] = []
+
+        for licenseDirectory in ["ofl", "apache", "ufl"] {
+            let path = "\(licenseDirectory)/\(slug)"
+
+            do {
+                entries = try await fetchEntries(path: path)
+                rootPath = path
+                break
+            } catch FontKitError.httpStatus(404) {
+                continue
+            }
+        }
+
+        guard let rootPath else {
+            throw FontKitError.fontNotFound(family)
+        }
+
+        if entries.contains(where: { $0.type == "dir" && $0.name == "static" }) {
+            entries += try await fetchEntries(path: rootPath + "/static")
+        }
+
+        let assets = entries.compactMap { entry -> FontAsset? in
+            guard entry.type == "file",
+                  ["ttf", "otf"].contains(
+                    URL(fileURLWithPath: entry.name).pathExtension.lowercased()
+                  ),
+                  let url = entry.downloadURL,
+                  url.scheme?.lowercased() == "https",
+                  url.host?.lowercased() == "raw.githubusercontent.com" else {
+                return nil
+            }
+
+            return FontAsset(remoteURL: url, filename: entry.name)
+        }
+
+        guard !assets.isEmpty else {
+            throw FontKitError.fontNotFound(family)
+        }
+
+        return assets.sorted { $0.filename < $1.filename }
     }
 }
 

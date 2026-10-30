@@ -12,6 +12,11 @@ public protocol FontCatalog: Sendable {
     func resolve(family: String, weight: FontWeight, style: FontStyle) async throws -> FontAsset
 }
 
+/// Protocol responsible for any type of font family asset catalog
+public protocol FontFamilyAssetCatalog: FontCatalog {
+    func assets(family: String) async throws -> [FontAsset]
+}
+
 /// Enum responsible for all types of font weight
 public enum FontWeight: Int, Codable, Sendable, CaseIterable {
     case thin = 100
@@ -52,6 +57,7 @@ public enum FontStyle: String, Codable, Sendable {
 public enum FontSource: Hashable, Sendable {
     case google(String)
     case url(URL)
+    case local(URL)
 }
 
 /// Enum responsible for all types of font kit error
@@ -65,6 +71,7 @@ public enum FontKitError: Error, LocalizedError, Sendable {
     case httpStatus(Int)
     case registrationFailed(String)
     case storageFailed(String)
+    case familyInspectionUnavailable
 
     // MARK: - PROPERTIES -
 
@@ -97,6 +104,9 @@ public enum FontKitError: Error, LocalizedError, Sendable {
 
         case .storageFailed(let reason):
             "Font cache failed: \(reason)"
+
+        case .familyInspectionUnavailable:
+            "This font catalog does not support family inspection."
         }
     }
 }
@@ -122,6 +132,9 @@ public struct FontRequest: Hashable, Sendable {
 
         case .url(let url):
             sourceKey = "url:" + url.absoluteString
+
+        case .local(let url):
+            sourceKey = "local:" + url.standardizedFileURL.path
         }
 
         return "\(sourceKey):\(weight.rawValue):\(style.rawValue)"
@@ -164,7 +177,7 @@ public struct FontRequest: Hashable, Sendable {
     
     /// In order to handle the font using custom specimen
     /// - Parameters:
-    ///   - url: `URL` repected link for the foot
+    ///   - url: `URL` respected link for the foot
     ///   - weight: `FontWeight` respected font weight of the font
     ///   - style: `FontStyle` respected font style of the font
     /// - Returns: `Self` will return the font after proper configuration
@@ -189,6 +202,50 @@ public struct FontRequest: Hashable, Sendable {
         }
 
         return .google(family, weight: weight, style: style)
+    }
+    
+    /// In order to handle the local font
+    /// - Parameters:
+    ///   - fileURL: `URL` respected local url
+    ///   - weight: `FontWeight` respected font weight of the font
+    ///   - style: `FontStyle` respected font style of the font
+    /// - Returns: `Self` will return the font after proper configuration
+    public static func local(
+        _ fileURL: URL,
+        weight: FontWeight = .regular,
+        style: FontStyle = .normal
+    ) -> Self {
+        Self(source: .local(fileURL.standardizedFileURL), weight: weight, style: style)
+    }
+    
+    /// In order to find a font included in the application or Swift package source bundle
+    /// - Parameters:
+    ///   - fileName: `String` file name for the font
+    ///   - bundle: `Bundle` local application bundle which is `main`
+    ///   - weight: `FontWeight` respected font weight
+    ///   - style: `FontStyle` respected font style
+    /// - Returns: `Self` will return the font after proper configuration
+    public static func bundled(
+        _ fileName: String,
+        in bundle: Bundle = .main,
+        weight: FontWeight = .regular,
+        style: FontStyle = .normal
+    ) throws -> Self {
+        let file = fileName as NSString
+        let name = file.deletingPathExtension
+        let ext = file.pathExtension.lowercased()
+
+        guard file.lastPathComponent == fileName,
+              !name.isEmpty,
+              ["ttf", "otf"].contains(ext) else {
+            throw FontKitError.invalidSource
+        }
+
+        guard let url = bundle.url(forResource: name, withExtension: ext) else {
+            throw FontKitError.fontNotFound(fileName)
+        }
+
+        return .local(url, weight: weight, style: style)
     }
 }
 

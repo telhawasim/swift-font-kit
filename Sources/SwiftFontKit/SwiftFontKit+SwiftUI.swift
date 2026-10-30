@@ -128,11 +128,7 @@ public extension View {
         relativeTo: Font.TextStyle = .body
     ) -> some View {
         modifier(GoogleFontModifier(
-            request: .google(
-                family,
-                weight: weight,
-                style: style
-            ),
+            request: .google(family, weight: weight, style: style),
             size: size,
             relativeTo: relativeTo
         ))
@@ -146,11 +142,21 @@ public extension View {
         relativeTo: Font.TextStyle = .body
     ) -> some View {
         modifier(GoogleFontModifier(
-            request: .remote(
-                url,
-                weight: weight,
-                style: style
-            ),
+            request: .remote(url, weight: weight, style: style),
+            size: size,
+            relativeTo: relativeTo
+        ))
+    }
+
+    func localFont(
+        _ fileURL: URL,
+        size: CGFloat,
+        weight: FontWeight = .regular,
+        style: FontStyle = .normal,
+        relativeTo: Font.TextStyle = .body
+    ) -> some View {
+        modifier(GoogleFontModifier(
+            request: .local(fileURL, weight: weight, style: style),
             size: size,
             relativeTo: relativeTo
         ))

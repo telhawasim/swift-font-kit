@@ -144,6 +144,16 @@ final class SwiftFontKitTests: XCTestCase {
             // Expected.
         }
     }
+
+    func testCatalogListsTTFFamilyAssets() async throws {
+        let catalog = GoogleFontGithubCatalog(transport: MockCatalogTransport())
+        let assets = try await catalog.assets(family: "Poppins")
+
+        XCTAssertEqual(assets.map(\.filename), [
+            "Poppins-Bold.ttf",
+            "Poppins-Regular.ttf"
+        ])
+    }
 }
 
 private struct MockCatalogTransport: FontTransport {

@@ -122,6 +122,43 @@ struct FontDiskCache {
             throw FontKitError.storageFailed(error.localizedDescription)
         }
     }
+
+    func storeLocal(data: Data, fileExtension ext: String) throws -> URL {
+        guard ["ttf", "otf"].contains(ext) else {
+            throw FontKitError.unsupportedFormat
+        }
+
+        guard data.count <= 25_000_000,
+              FontSignature.isSupported(data) else {
+            throw FontKitError.invalidFontData
+        }
+
+        let digest = FontDigest.sha256(data)
+        let destination = assetsDirectory.appendingPathComponent(
+            "local-\(digest).\(ext)"
+        )
+
+        do {
+            let manager = FileManager.default
+            try manager.createDirectory(at: assetsDirectory, withIntermediateDirectories: true)
+
+            if manager.fileExists(atPath: destination.path) {
+                guard try Data(contentsOf: destination) == data else {
+                    throw FontKitError.storageFailed(
+                        "Cached local font failed integrity verification."
+                    )
+                }
+            } else {
+                try data.write(to: destination, options: .atomic)
+            }
+
+            return destination
+        } catch let error as FontKitError {
+            throw error
+        } catch {
+            throw FontKitError.storageFailed(error.localizedDescription)
+        }
+    }
 }
 
 // MARK: - HELPER FUNCTIONS -
